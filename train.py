@@ -42,6 +42,20 @@ def build_process_pipeline(pipeline_confg):
     return process_pipelines
 
 
+def get_warmup_lr(cur_iters, warmup_iters, bash_lr, warmup_ratio, warmup='linear'):
+    if warmup == 'constant':
+        warmup_lr = bash_lr * warmup_ratio 
+    elif warmup == 'linear':
+        k = (1 - cur_iters / warmup_iters) * (1 - warmup_ratio)
+        warmup_lr = bash_lr * (1 - k)
+    elif warmup == 'exp':
+        k = warmup_ratio**(1 - cur_iters / warmup_iters)
+        warmup_lr = bash_lr * k
+    return warmup_lr
+
+    
+
+
 def train(epoch_iters = 1, total_epochs = 36):
     #train process pipelines func
     transforms_piplines = build_process_pipeline(cfg.train_pipeline)
@@ -84,11 +98,16 @@ def train(epoch_iters = 1, total_epochs = 36):
     else:
         raise NotImplementedError("train epoch is done!")
 
-    
+    #epoch has trained times
     base_loop = epoch_iters
+
+    #left epoch need traind times
     left_loops = total_epochs - base_loop + 1
+
+    #all left iter nums
     total_nums = left_loops * epoch_size
     left_nums = total_nums
+    base_nums = (base_loop - 1)*bachasize
 
     loss_sum = 0.0 
     loss_ins = 0.0 
@@ -118,6 +137,13 @@ def train(epoch_iters = 1, total_epochs = 36):
 
             for j, data in enumerate(torchdata_loader):
                
+                if cfg.lr_config['warmup'] is not None and base_nums < cfg.lr_config['warmup_iters']:
+                    warm_lr = get_warmup_lr(base_nums, cfg.lr_config['warmup_iters'],
+                                            optimizer_config['lr'], cfg.lr_config['warmup_ratio'],
+                                            cfg.lr_config['warmup'])
+                    set_lr(optimizer, warm_lr)
+                    new_lr = warm_lr
+                
                 last_time = time.time()
                 imgs = gradinator(data['img'].data[0].cuda())
                 img_meta = data['img_metas'].data[0]   #图片的一些原始信息
@@ -156,17 +182,18 @@ def train(epoch_iters = 1, total_epochs = 36):
 
                 left_nums = left_nums - 1
                 use_time = time.time() - last_time
+                base_nums = base_nums + 1
                 #ervery iter 50 times, print some logger
                 if j%50 == 0:
-                    left_time = use_time*(epoch_size - j + left_loops*epoch_size)
+                    left_time = use_time*(total_nums - base_nums)
                     left_minut = left_time/60.0
                     left_hours =  left_minut/60.0
                     left_day = left_hours//24
                     left_hour = left_hours%24
 
-                    out_srt = 'epoch:[' + str(iter_nums + base_loop) + ']/[' + str(left_loops) + '],';
+                    out_srt = 'epoch:[' + str(iter_nums + base_loop) + ']/[' + str(total_epochs) + '],';
                     out_srt = out_srt + '[' + str(j) + ']/' + str(epoch_size) + '], left_time:' + str(left_day) + 'days,' + format(left_hour,'.2f') + 'h,'
-                    print(out_srt, "loss: ", format(loss_sum/50.0,'.4f'), ' loss_ins:', format(loss_ins/50.0,'.4f'), "loss_cate:", format(loss_cate/50.0,'.4f'), "lr:", new_lr)
+                    print(out_srt, "loss: ", format(loss_sum/50.0,'.4f'), ' loss_ins:', format(loss_ins/50.0,'.4f'), "loss_cate:", format(loss_cate/50.0,'.4f'), "lr:",  format(new_lr,'.5f'))
                     loss_sum = 0.0 
                     loss_ins = 0.0 
                     loss_cate = 0.0
@@ -182,4 +209,4 @@ def train(epoch_iters = 1, total_epochs = 36):
         model.save_weights(save_name)      
 
 if __name__ == '__main__':
-    train(epoch_iters=1)   #第一次迭代，需要将该函数设施
+    train(epoch_iters=cfg.epoch_iters_start, total_epochs = cfg.total_epoch)   #设置本次训练的起始epoch
