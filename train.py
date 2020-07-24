@@ -188,7 +188,7 @@ def train(epoch_iters = 1, total_epochs = 36):
                 use_time = time.time() - last_time
                 base_nums = base_nums + 1
                 #ervery iter 50 times, print some logger
-                if j%50 == 0:
+                if j%50 == 0 and j != 0::
                     left_time = use_time*(total_nums - base_nums)
                     left_minut = left_time/60.0
                     left_hours =  left_minut/60.0
