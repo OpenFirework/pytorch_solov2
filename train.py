@@ -19,9 +19,6 @@ def clip_grads(params):
 def set_lr(optimizer, new_lr):
     for param_group in optimizer.param_groups:
         param_group['lr'] = new_lr
-    
-    global cur_lr
-    cur_lr = new_lr
 
 #set requires_grad False
 def gradinator(x):
@@ -67,12 +64,12 @@ def train(epoch_iters = 1, total_epochs = 36):
                             data_root=cfg.dataset.train_prefix)
     
    
-    # #load datashet bachasize = cfg.imgs_per_gpu*cfg.workers_per_gpu
+    # #load datashet batchsize = cfg.imgs_per_gpu*cfg.num_gpus
     torchdata_loader = build_dataloader(casiadata, cfg.imgs_per_gpu, cfg.workers_per_gpu, num_gpus=cfg.num_gpus, shuffle=True)
 
-    bachasize = cfg.imgs_per_gpu*cfg.workers_per_gpu
+    batchsize = cfg.imgs_per_gpu*cfg.num_gpus
 
-    epoch_size = len(casiadata) // bachasize  
+    epoch_size = len(casiadata) // batchsize  
     step_index = 0
 
     
@@ -107,14 +104,15 @@ def train(epoch_iters = 1, total_epochs = 36):
     #all left iter nums
     total_nums = left_loops * epoch_size
     left_nums = total_nums
-    base_nums = (base_loop - 1)*bachasize
+    base_nums = (base_loop - 1)*batchsize
 
     loss_sum = 0.0 
     loss_ins = 0.0 
     loss_cate = 0.0
     start_time = 0
     end_time = 0
-    new_lr = optimizer_config['lr']
+    base_lr = optimizer_config['lr']
+    cur_lr = base_lr
     print('##### begin train ######')
 
     try:
@@ -124,13 +122,16 @@ def train(epoch_iters = 1, total_epochs = 36):
             epoch_iters = iter_nums + base_loop
             if epoch_iters < cfg.lr_config['step'][0]:
                 set_lr(optimizer, 0.01)
-                new_lr = 0.01
+                base_lr = 0.01
+                cur_lr = 0.01
             elif epoch_iters > cfg.lr_config['step'][0] and epoch_iters < cfg.lr_config['step'][1]:
                 set_lr(optimizer, 0.001)
-                new_lr = 0.001
+                base_lr = 0.001
+                cur_lr = 0.001
             elif epoch_iters >  cfg.lr_config['step'][1] and epoch_iters < total_epochs:
                 set_lr(optimizer, 0.0001)
-                new_lr = 0.0001
+                base_lr = 0.0001
+                cur_lr = 0.0001
             else:
                 raise NotImplementedError("train epoch is done!")
            
@@ -142,7 +143,10 @@ def train(epoch_iters = 1, total_epochs = 36):
                                             optimizer_config['lr'], cfg.lr_config['warmup_ratio'],
                                             cfg.lr_config['warmup'])
                     set_lr(optimizer, warm_lr)
-                    new_lr = warm_lr
+                    cur_lr = warm_lr
+                else:
+                    set_lr(optimizer, base_lr)
+                    cur_lr = base_lr
                 
                 last_time = time.time()
                 imgs = gradinator(data['img'].data[0].cuda())
@@ -184,7 +188,7 @@ def train(epoch_iters = 1, total_epochs = 36):
                 use_time = time.time() - last_time
                 base_nums = base_nums + 1
                 #ervery iter 50 times, print some logger
-                if j%50 == 0 and j != 0:
+                if j%50 == 0:
                     left_time = use_time*(total_nums - base_nums)
                     left_minut = left_time/60.0
                     left_hours =  left_minut/60.0
@@ -193,7 +197,7 @@ def train(epoch_iters = 1, total_epochs = 36):
 
                     out_srt = 'epoch:[' + str(iter_nums + base_loop) + ']/[' + str(total_epochs) + '],';
                     out_srt = out_srt + '[' + str(j) + ']/' + str(epoch_size) + '], left_time:' + str(left_day) + 'days,' + format(left_hour,'.2f') + 'h,'
-                    print(out_srt, "loss: ", format(loss_sum/50.0,'.4f'), ' loss_ins:', format(loss_ins/50.0,'.4f'), "loss_cate:", format(loss_cate/50.0,'.4f'), "lr:",  format(new_lr,'.5f'))
+                    print(out_srt, "loss: ", format(loss_sum/50.0,'.4f'), ' loss_ins:', format(loss_ins/50.0,'.4f'), "loss_cate:", format(loss_cate/50.0,'.4f'), "lr:",  format(cur_lr,'.5f'))
                     loss_sum = 0.0 
                     loss_ins = 0.0 
                     loss_cate = 0.0
