@@ -104,7 +104,7 @@ def train(epoch_iters = 1, total_epochs = 36):
     #all left iter nums
     total_nums = left_loops * epoch_size
     left_nums = total_nums
-    base_nums = (base_loop - 1)*batchsize
+    base_nums = (base_loop - 1)*epoch_size
 
     loss_sum = 0.0 
     loss_ins = 0.0 
