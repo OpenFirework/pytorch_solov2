@@ -16,10 +16,12 @@ mmcv-full中的focalloss的实现与SOLO原版中的实现有差别（背景类�
 因此替换为原本focalloss实现,安装好pytorch,cuda等必须的环境之后，项目根目录下执行python setup develop即可编译原版的focalloss    
 替换之后，重新训练，损失和预测都正常
 
-2020-10-13更新    
-完善评测代码，保存为实例分割后的图片
-![avatar](results/00106.jpg)
-![avatar](results/00113.jpg)
+2020-10-13更新          
+完善评测代码，保存为实例分割后的图片     
+      
+![avatar](results/00106.jpg)     
+
+![avatar](results/00113.jpg)  
 
 
 ## 训练
