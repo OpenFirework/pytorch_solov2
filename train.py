@@ -86,11 +86,12 @@ def train(epoch_iters = 1, total_epochs = 36):
     optimizer_config = cfg.optimizer
     optimizer = optim.SGD(model.parameters(), lr=optimizer_config['lr'], momentum=optimizer_config['momentum'], weight_decay=optimizer_config['weight_decay'])
 
+    print(epoch_iters, cfg.lr_config['step'][0], cfg.lr_config['step'][1],total_epochs )
     if epoch_iters < cfg.lr_config['step'][0]:
         set_lr(optimizer, 0.01)
-    elif epoch_iters > cfg.lr_config['step'][0] and epoch_iters < cfg.lr_config['step'][1]:
+    elif epoch_iters >= cfg.lr_config['step'][0] and epoch_iters < cfg.lr_config['step'][1]:
         set_lr(optimizer, 0.001)
-    elif epoch_iters >  cfg.lr_config['step'][1] and epoch_iters < total_epochs:
+    elif epoch_iters >=  cfg.lr_config['step'][1] and epoch_iters <= total_epochs:
         set_lr(optimizer, 0.0001)
     else:
         raise NotImplementedError("train epoch is done!")
@@ -105,7 +106,6 @@ def train(epoch_iters = 1, total_epochs = 36):
     total_nums = left_loops * epoch_size
     left_nums = total_nums
     base_nums = (base_loop - 1)*epoch_size
-
     loss_sum = 0.0 
     loss_ins = 0.0 
     loss_cate = 0.0
@@ -114,7 +114,8 @@ def train(epoch_iters = 1, total_epochs = 36):
     base_lr = optimizer_config['lr']
     cur_lr = base_lr
     print('##### begin train ######')
-
+    cur_nums = 0   
+ 
     try:
         for iter_nums in range(left_loops):
 
@@ -124,11 +125,11 @@ def train(epoch_iters = 1, total_epochs = 36):
                 set_lr(optimizer, 0.01)
                 base_lr = 0.01
                 cur_lr = 0.01
-            elif epoch_iters > cfg.lr_config['step'][0] and epoch_iters < cfg.lr_config['step'][1]:
+            elif epoch_iters >= cfg.lr_config['step'][0] and epoch_iters < cfg.lr_config['step'][1]:
                 set_lr(optimizer, 0.001)
                 base_lr = 0.001
                 cur_lr = 0.001
-            elif epoch_iters >  cfg.lr_config['step'][1] and epoch_iters < total_epochs:
+            elif epoch_iters >=  cfg.lr_config['step'][1] and epoch_iters <= total_epochs:
                 set_lr(optimizer, 0.0001)
                 base_lr = 0.0001
                 cur_lr = 0.0001
@@ -186,10 +187,11 @@ def train(epoch_iters = 1, total_epochs = 36):
 
                 left_nums = left_nums - 1
                 use_time = time.time() - last_time
-                base_nums = base_nums + 1
+                #base_nums = base_nums + 1
+                cur_nums = cur_nums + 1
                 #ervery iter 50 times, print some logger
-                if j%50 == 0 and j != 0::
-                    left_time = use_time*(total_nums - base_nums)
+                if j%50 == 0 and j != 0:
+                    left_time = use_time*(total_nums - cur_nums)
                     left_minut = left_time/60.0
                     left_hours =  left_minut/60.0
                     left_day = left_hours//24

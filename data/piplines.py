@@ -750,7 +750,8 @@ class Collect(object):
         img_meta = {}
         for key in self.meta_keys:
             img_meta[key] = results[key]
-        data['img_metas'] = DC(img_meta, cpu_only=True)
+        #data['img_metas'] = DC(img_meta, cpu_only=True)
+        data['img_metas'] = img_meta
         for key in self.keys:
             data[key] = results[key]
         return data

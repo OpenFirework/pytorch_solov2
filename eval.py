@@ -11,7 +11,52 @@ import pycocotools.mask as mask_util
 import numpy as np
 import mmcv
 from data.coco_utils import  coco_eval, results2json, results2json_segm
+import cv2 as cv
+from data.compose import Compose
+from glob import glob
+import pycocotools.mask as maskutil
+import json
+import os
+from scipy import ndimage
 
+COCO_LABEL = [1,  2,  3,  4,  5,  6,  7,  8,
+                   9, 10, 11, 13, 14, 15, 16, 17,
+                  18, 19, 20, 21, 22, 23, 24, 25,
+                  27, 28, 31, 32, 33, 34, 35, 36,
+                  37, 38, 39, 40, 41, 42, 43, 44,
+                  46, 47, 48, 49, 50, 51, 52, 53,
+                  54, 55, 56, 57, 58, 59, 60, 61,
+                  62, 63, 64, 65, 67, 70, 72, 73,
+                  74, 75, 76, 77, 78, 79, 80, 81,
+                  82, 84, 85, 86, 87, 88, 89, 90]
+
+COCO_LABEL_MAP = { 1:  1,  2:  2,  3:  3,  4:  4,  5:  5,  6:  6,  7:  7,  8:  8,
+                   9:  9, 10: 10, 11: 11, 13: 12, 14: 13, 15: 14, 16: 15, 17: 16,
+                  18: 17, 19: 18, 20: 19, 21: 20, 22: 21, 23: 22, 24: 23, 25: 24,
+                  27: 25, 28: 26, 31: 27, 32: 28, 33: 29, 34: 30, 35: 31, 36: 32,
+                  37: 33, 38: 34, 39: 35, 40: 36, 41: 37, 42: 38, 43: 39, 44: 40,
+                  46: 41, 47: 42, 48: 43, 49: 44, 50: 45, 51: 46, 52: 47, 53: 48,
+                  54: 49, 55: 50, 56: 51, 57: 52, 58: 53, 59: 54, 60: 55, 61: 56,
+                  62: 57, 63: 58, 64: 59, 65: 60, 67: 61, 70: 62, 72: 63, 73: 64,
+                  74: 65, 75: 66, 76: 67, 77: 68, 78: 69, 79: 70, 80: 71, 81: 72,
+                  82: 73, 84: 74, 85: 75, 86: 76, 87: 77, 88: 78, 89: 79, 90: 80}
+
+COCO_CLASSES = ('person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus',
+                'train', 'truck', 'boat', 'traffic light', 'fire hydrant',
+                'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog',
+                'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe',
+                'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee',
+                'skis', 'snowboard', 'sports ball', 'kite', 'baseball bat',
+                'baseball glove', 'skateboard', 'surfboard', 'tennis racket',
+                'bottle', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl',
+                'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot',
+                'hot dog', 'pizza', 'donut', 'cake', 'chair', 'couch',
+                'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop',
+                'mouse', 'remote', 'keyboard', 'cell phone', 'microwave', 'oven',
+                'toaster', 'sink', 'refrigerator', 'book', 'clock', 'vase',
+                'scissors', 'teddy bear', 'hair drier', 'toothbrush')
+
+CLASS_NAMES=(COCO_CLASSES, COCO_LABEL)
 
 def get_masks(result, num_classes=80):
     for cur_result in result:
@@ -50,69 +95,173 @@ def build_process_pipeline(pipeline_confg):
             
     return process_pipelines
 
+def result2json(img_id, result):
+    rel = []
+    seg_pred = result[0][0].cpu().numpy().astype(np.uint8)
+    cate_label = result[0][1].cpu().numpy().astype(np.int)
+    cate_score = result[0][2].cpu().numpy().astype(np.float)
+    num_ins = seg_pred.shape[0]
+    for j in range(num_ins):
+        realclass = COCO_LABEL[cate_label[j]]
+        re = {}
+        score = cate_score[j]
+        re["image_id"] = img_id
+        re["category_id"] = int(realclass)
+        re["score"] = float(score)
+        outmask = np.squeeze(seg_pred[j])
+        outmask = outmask.astype(np.uint8)
+        outmask=np.asfortranarray(outmask)
+        rle = maskutil.encode(outmask)
+        rle['counts'] = rle['counts'].decode('ascii')
+        re["segmentation"] = rle
+        rel.append(re)
+    return rel
 
-def eval(valmodel_weight):
-    test_pipelines = []
-    loadimg = process_funcs_dict['LoadImageFromFile']()
-    test_pipelines.append(loadimg)
+class LoadImage(object):
+    def __call__(self, results):
+        if isinstance(results['img'], str):
+            results['filename'] = results['img']
+        else:
+            results['filename'] = None 
+        img = cv.imread(results['img'])
+        results['img'] = img
+        results['img_shape'] = img.shape
+        results['ori_shape'] = img.shape
+        return results
 
+
+
+def show_result_ins(img,
+                    result,
+                    score_thr=0.3,
+                    sort_by_density=False,
+                    out_file=None):
+    img = mmcv.imread(img)
+    img_show = img.copy()
+    h, w, _ = img.shape
+
+    cur_result = result[0]
+    seg_label = cur_result[0]
+    seg_label = seg_label.cpu().numpy().astype(np.uint8)
+    cate_label = cur_result[1]
+    cate_label = cate_label.cpu().numpy()
+    score = cur_result[2].cpu().numpy()
+
+    vis_inds = score > score_thr
+    seg_label = seg_label[vis_inds]
+    num_mask = seg_label.shape[0]
+    cate_label = cate_label[vis_inds]
+    cate_score = score[vis_inds]
+
+    if sort_by_density:
+        mask_density = []
+        for idx in range(num_mask):
+            cur_mask = seg_label[idx, :, :]
+            cur_mask = mmcv.imresize(cur_mask, (w, h))
+            cur_mask = (cur_mask > 0.5).astype(np.int32)
+            mask_density.append(cur_mask.sum())
+        orders = np.argsort(mask_density)
+        seg_label = seg_label[orders]
+        cate_label = cate_label[orders]
+        cate_score = cate_score[orders]
+
+    np.random.seed(42)
+    color_masks = [
+        np.random.randint(0, 256, (1, 3), dtype=np.uint8)
+        for _ in range(num_mask)
+    ]
+    for idx in range(num_mask):
+        idx = -(idx+1)
+        cur_mask = seg_label[idx, :, :]
+        cur_mask = mmcv.imresize(cur_mask, (w, h))
+        cur_mask = (cur_mask > 0.5).astype(np.uint8)
+        if cur_mask.sum() == 0:
+            continue
+        color_mask = color_masks[idx]
+        cur_mask_bool = cur_mask.astype(np.bool)
+        img_show[cur_mask_bool] = img[cur_mask_bool] * 0.5 + color_mask * 0.5
+
+        #当前实例的类别
+        cur_cate = cate_label[idx]
+        realclass = COCO_LABEL[cur_cate]
+        cur_score = cate_score[idx]
+
+        name_idx = COCO_LABEL_MAP[realclass]
+        label_text = COCO_CLASSES[name_idx-1]
+        print(realclass, label_text)
+        label_text += '|{:.02f}'.format(cur_score)
+        center_y, center_x = ndimage.measurements.center_of_mass(cur_mask)
+        vis_pos = (max(int(center_x) - 10, 0), int(center_y))
+        cv.putText(img_show, label_text, vis_pos,
+                        cv.FONT_HERSHEY_COMPLEX, 0.3, (255, 255, 255))  # green
+    if out_file is None:
+        return img
+    else:
+        mmcv.imwrite(img_show, out_file)
+
+def eval(valmodel_weight, test_imgpath):
+
+    test_pipeline = []
     transforms=[ dict(type='Resize', keep_ratio=True),
-                dict(type='RandomFlip'),
                 dict(type='Normalize', mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True),
                 dict(type='Pad', size_divisor=32),
                 dict(type='ImageToTensor', keys=['img']),
                 dict(type='Collect', keys=['img']),
-            ]
-
+    ]
     transforms_piplines = build_process_pipeline(transforms)
-    Multest = process_funcs_dict['MultiScaleFlipAug'](transforms = transforms_piplines, img_scale = (768, 448), flip=False)
-    test_pipelines.append(Multest)
+    Multest = process_funcs_dict['MultiScaleFlipAug'](transforms = transforms_piplines, img_scale = (480, 448), flip=False)
 
-     # #build datashet
-    casiadata = CocoDataset(ann_file=cfg.dataset.valid_info,
-                            pipeline = test_pipelines,
-                            img_prefix = cfg.dataset.validimg_prefix,
-                            data_root=cfg.dataset.valid_prefix,
-                            test_mode=True)
+    test_pipeline.append(LoadImage())
+    test_pipeline.append(Multest)
+    test_pipeline = Compose(test_pipeline)
 
-    torchdata_loader = build_dataloader(casiadata, imgs_per_gpu=1, workers_per_gpu=cfg.workers_per_gpu, num_gpus=1, shuffle=False)
-
-    model = SOLOV2(cfg, pretrained = valmodel_weight, mode='test')
+    model = SOLOV2(cfg, pretrained=valmodel_weight, mode='test')
     model = model.cuda()
 
-    results = []
-    for k, enumdata in enumerate(torchdata_loader):
-
-        imgs = enumdata['img']
-        inputs = []
-        for img in imgs:
-            inputs.append(img.cuda())
-        
-        img_infos = []
-        img_metas = enumdata['img_metas']   #图片的一些原始信息
-        for img_meta in img_metas:
-            img_infos.append(img_meta.data[0])
-        
-        with torch.no_grad():      
-            seg_result = model.forward(img=inputs, img_meta=img_infos, return_loss=False)
-        #mask [nums, height, weight] 
-        #cls [nums]
-        #scores [nums]
-        result = get_masks(seg_result, num_classes=80)
-
-        results.append(result)
-
-    eval_types = ['segm']
-    mmcv.dump(results, "reseg_results.pkl")
-    if not isinstance(results[0], dict):
-        result_files = results2json_segm(casiadata, results, "reseg_results.pkl")
-        coco_eval(result_files, eval_types, casiadata.coco)
+    img_ids = []
+    images = []
+    use_json = True
+    imgs_prefix = "data/casia-SPT_val/val"
+    if use_json == False:
+        test_imgpath = test_imgpath + '/*'
+        images = glob(test_imgpath)
+        for img in images:
+            pathname,filename = os.path.split(img)
+            prefix,suffix = os.path.splitext(filename)
+            img_id = int(prefix)
+            img_ids.append(str(img_id))  
     else:
-        for name in results[0]:
-            print('\nEvaluating {}'.format(name))
-            outputs_ = [out[name] for out in results]
-            result_file = "reseg_results.json" + '.{}'.format(name)
-            result_files = results2json(casiadata, outputs_, result_file)
-            coco_eval(result_files, eval_types, casiadata.coco)
+         imgsinfo=json.load(open("data/casia-SPT_val/val/val_annotation.json",'r'))
+         for i in range(len(imgsinfo['images'])):
+           img_id = imgsinfo['images'][i]['id']
+           img_path = imgs_prefix + '/'+ imgsinfo['images'][i]['file_name']
+           img_ids.append(img_id)
+           images.append(img_path)
 
-eval(valmodel_weight='pretrained/solov2_448_r18_epoch_36.pth')
+   
+
+    
+    imgs_nums = len(images)
+    results = []
+    k = 0
+    for imgpath in images:
+        img_id = img_ids[k]
+        data = dict(img=imgpath)
+        data = test_pipeline(data)
+        imgs = data['img']
+
+        img = imgs[0].cuda().unsqueeze(0)
+        img_info = data['img_metas']
+        with torch.no_grad():
+            seg_result = model.forward(img=[img], img_meta=[img_info], return_loss=False)
+        out_filepath = "results/" + imgpath
+        show_result_ins(imgpath,seg_result,out_file=out_filepath)
+        result = result2json(img_id, seg_result)
+        results = results + result
+        k += 1
+    re_js = json.dumps(results)
+    fjson = open("eval_masks.json","w")
+    fjson.write(re_js)
+    fjson.close()
+
+eval(valmodel_weight='pretrained/solov2_448_r18_epoch_36.pth',test_imgpath="data/casia-SPT_val/val/JPEGImages")

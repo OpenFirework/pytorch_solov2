@@ -277,11 +277,9 @@ solov2_base_config = coco_base_config.copy({
                 update_thr=0.05,
                 kernel='gaussian',  # gaussian/linear
                 sigma=2.0,
-                max_per_img=100)
+                max_per_img=30)
 
 })
-
-
 
 cfg = solov2_base_config.copy()
 

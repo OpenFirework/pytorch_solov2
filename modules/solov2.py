@@ -170,7 +170,6 @@ class SOLOV2(nn.Module):
 
         self.test_cfg = cfg.test_cfg
 
-
         if self.mode == 'train':
             self.backbone.train(mode=True)
         else:
