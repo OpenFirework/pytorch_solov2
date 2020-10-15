@@ -76,12 +76,10 @@ def get_masks(result, num_classes=80):
 
         return masks
 
-
 #set requires_grad False
 def gradinator(x):
     x.requires_grad = False
     return x
-
 
 def build_process_pipeline(pipeline_confg):
     assert isinstance(pipeline_confg, list)
@@ -129,14 +127,22 @@ class LoadImage(object):
         results['ori_shape'] = img.shape
         return results
 
+class LoadImageInfo(object):
+    def __call__(self, frame):
+        results={}
+        results['filename'] = None 
+        results['img'] = frame
+        results['img_shape'] = frame.shape
+        results['ori_shape'] = frame.shape
+        return results
 
 
 def show_result_ins(img,
                     result,
                     score_thr=0.3,
-                    sort_by_density=False,
-                    out_file=None):
-    img = mmcv.imread(img)
+                    sort_by_density=False):
+    if isinstance(img, str):
+        img = cv.imread(img)
     img_show = img.copy()
     h, w, _ = img.shape
 
@@ -170,6 +176,7 @@ def show_result_ins(img,
         np.random.randint(0, 256, (1, 3), dtype=np.uint8)
         for _ in range(num_mask)
     ]
+    #img_show = None
     for idx in range(num_mask):
         idx = -(idx+1)
         cur_mask = seg_label[idx, :, :]
@@ -194,13 +201,12 @@ def show_result_ins(img,
         vis_pos = (max(int(center_x) - 10, 0), int(center_y))
         cv.putText(img_show, label_text, vis_pos,
                         cv.FONT_HERSHEY_COMPLEX, 0.3, (255, 255, 255))  # green
-    if out_file is None:
-        return img
-    else:
-        mmcv.imwrite(img_show, out_file)
+ 
+    return img_show
 
-def eval(valmodel_weight, test_imgpath):
 
+def eval(valmodel_weight, data_path, benchmark, test_mode):
+    
     test_pipeline = []
     transforms=[ dict(type='Resize', keep_ratio=True),
                 dict(type='Normalize', mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True),
@@ -211,57 +217,98 @@ def eval(valmodel_weight, test_imgpath):
     transforms_piplines = build_process_pipeline(transforms)
     Multest = process_funcs_dict['MultiScaleFlipAug'](transforms = transforms_piplines, img_scale = (480, 448), flip=False)
 
-    test_pipeline.append(LoadImage())
+    if test_mode == "video":
+        test_pipeline.append(LoadImageInfo())
+    elif test_mode == "images":
+        test_pipeline.append(LoadImage())
+    else:
+        raise NotImplementedError("not support mode!")
     test_pipeline.append(Multest)
     test_pipeline = Compose(test_pipeline)
 
     model = SOLOV2(cfg, pretrained=valmodel_weight, mode='test')
     model = model.cuda()
 
-    img_ids = []
-    images = []
-    use_json = True
-    imgs_prefix = "data/casia-SPT_val/val"
-    if use_json == False:
-        test_imgpath = test_imgpath + '/*'
-        images = glob(test_imgpath)
-        for img in images:
-            pathname,filename = os.path.split(img)
-            prefix,suffix = os.path.splitext(filename)
-            img_id = int(prefix)
-            img_ids.append(str(img_id))  
-    else:
-         imgsinfo=json.load(open("data/casia-SPT_val/val/val_annotation.json",'r'))
-         for i in range(len(imgsinfo['images'])):
-           img_id = imgsinfo['images'][i]['id']
-           img_path = imgs_prefix + '/'+ imgsinfo['images'][i]['file_name']
-           img_ids.append(img_id)
-           images.append(img_path)
 
-   
+    if test_mode == "video":
+        vid = cv.VideoCapture(data_path)
+        target_fps   = round(vid.get(cv.CAP_PROP_FPS))
+        frame_width  = round(vid.get(cv.CAP_PROP_FRAME_WIDTH))
+        frame_height = round(vid.get(cv.CAP_PROP_FRAME_HEIGHT))
+        num_frames = round(vid.get(cv.CAP_PROP_FRAME_COUNT))
+        
+        for i in range(num_frames):
+            if i%5 != 0:
+                continue
+            frame=vid.read()
+            img=frame[1]
+            data = test_pipeline(img)
+            imgs = data['img']
 
-    
-    imgs_nums = len(images)
-    results = []
-    k = 0
-    for imgpath in images:
-        img_id = img_ids[k]
-        data = dict(img=imgpath)
-        data = test_pipeline(data)
-        imgs = data['img']
+            img = imgs[0].cuda().unsqueeze(0)
+            img_info = data['img_metas']
+            start = time.time()
+            with torch.no_grad():
+                seg_result = model.forward(img=[img], img_meta=[img_info], return_loss=False)
+            
+            img_show = show_result_ins(frame[1],seg_result)
+            end = time.time()
+            print("spend time: ",(end-start))
+            cv.imshow("watch windows",img_show)
+            cv.waitKey(1)
 
-        img = imgs[0].cuda().unsqueeze(0)
-        img_info = data['img_metas']
-        with torch.no_grad():
-            seg_result = model.forward(img=[img], img_meta=[img_info], return_loss=False)
-        out_filepath = "results/" + imgpath
-        show_result_ins(imgpath,seg_result,out_file=out_filepath)
-        result = result2json(img_id, seg_result)
-        results = results + result
-        k += 1
-    re_js = json.dumps(results)
-    fjson = open("eval_masks.json","w")
-    fjson.write(re_js)
-    fjson.close()
+    if test_mode == "images":
+        img_ids = []
+        images = []
+        use_json = False
+        imgs_prefix = "tests"
+        test_imgpath = data_path
+        if use_json == False:
+            test_imgpath = test_imgpath + '/*'
+            images = glob(test_imgpath)
+            for img in images:
+                pathname,filename = os.path.split(img)
+                prefix,suffix = os.path.splitext(filename)
+                img_id = int(prefix)
+                img_ids.append(str(img_id))  
+        else:
+            imgsinfo=json.load(open("data/casia-SPT_val/val/val_annotation.json",'r'))
+            for i in range(len(imgsinfo['images'])):
+                img_id = imgsinfo['images'][i]['id']
+                img_path = imgs_prefix + '/'+ imgsinfo['images'][i]['file_name']
+                img_ids.append(img_id)
+                images.append(img_path)
 
-eval(valmodel_weight='pretrained/solov2_448_r18_epoch_36.pth',test_imgpath="data/casia-SPT_val/val/JPEGImages")
+        imgs_nums = len(images)
+        results = []
+        k = 0
+        save_imgs = False
+        for imgpath in images:
+            img_id = img_ids[k]
+            data = dict(img=imgpath)
+            data = test_pipeline(data)
+            imgs = data['img']
+
+            img = imgs[0].cuda().unsqueeze(0)
+            img_info = data['img_metas']
+            with torch.no_grad():
+                seg_result = model.forward(img=[img], img_meta=[img_info], return_loss=False)
+            out_filepath = "results/" + imgpath
+            img_show = show_result_ins(imgpath,seg_result)
+
+            cv.imshow("watch windows",img_show)
+            cv.waitKey(1)
+            k = k + 1
+            if save_imgs:
+                cv.imwrite(out_filepath, img_show)
+            if benchmark == True:
+                result = result2json(img_id, seg_result)
+                results = results + result
+
+        if benchmark == True:
+            re_js = json.dumps(results)
+            fjson = open("eval_masks.json","w")
+            fjson.write(re_js)
+            fjson.close()
+
+eval(valmodel_weight='pretrained/solov2_448_r18_epoch_36.pth',data_path="cam0.avi", benchmark=False, test_mode="video")

@@ -66,22 +66,19 @@ def train(epoch_iters = 1, total_epochs = 36):
    
     # #load datashet batchsize = cfg.imgs_per_gpu*cfg.num_gpus
     torchdata_loader = build_dataloader(casiadata, cfg.imgs_per_gpu, cfg.workers_per_gpu, num_gpus=cfg.num_gpus, shuffle=True)
-
     batchsize = cfg.imgs_per_gpu*cfg.num_gpus
-
     epoch_size = len(casiadata) // batchsize  
     step_index = 0
 
     
     if cfg.resume_from is None:
-        model = SOLOV2(cfg,pretrained=None, mode='train')
+        model = SOLOV2(cfg, pretrained=None, mode='train')
         print('cfg.resume_from is None')
     else:
-        model = SOLOV2(cfg,pretrained=cfg.resume_from, mode='train')   #从训练好的权重文件载入
+        model = SOLOV2(cfg, pretrained=cfg.resume_from, mode='train')   #从训练好的权重文件载入
     
     model = model.cuda()
     model = model.train()
-
 
     optimizer_config = cfg.optimizer
     optimizer = optim.SGD(model.parameters(), lr=optimizer_config['lr'], momentum=optimizer_config['momentum'], weight_decay=optimizer_config['weight_decay'])
@@ -96,7 +93,7 @@ def train(epoch_iters = 1, total_epochs = 36):
     else:
         raise NotImplementedError("train epoch is done!")
 
-    #epoch has trained times
+    #epoch has trained times, start loop times
     base_loop = epoch_iters
 
     #left epoch need traind times
@@ -187,7 +184,7 @@ def train(epoch_iters = 1, total_epochs = 36):
 
                 left_nums = left_nums - 1
                 use_time = time.time() - last_time
-                #base_nums = base_nums + 1
+                base_nums = base_nums + 1
                 cur_nums = cur_nums + 1
                 #ervery iter 50 times, print some logger
                 if j%50 == 0 and j != 0:
