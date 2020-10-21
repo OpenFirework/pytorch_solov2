@@ -24,6 +24,9 @@ mmcv-full中的focalloss的实现与SOLO原版中的实现有差别（背景类�
 ![avatar](results/00113.jpg)  
 
 
+增加视频测试功能  
+
+
 ## 训练
 
 配置好config中的项目之后，直接 python train.py      
@@ -52,8 +55,6 @@ cls [nums]                     #每个mask对应的分类
 scores [nums]                  #每个mask对应的得分 
  ```
  
- 
-5. 转onnx时，torch.linspace, group normal层好像不支持变成了ATen，后续待解决   
 
 ## 参考
 https://github.com/WXinlong/SOLO   
