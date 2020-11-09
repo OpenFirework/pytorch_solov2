@@ -45,7 +45,7 @@ mmcv-full中的focalloss的实现与SOLO原版中的实现有差别（背景类�
 ## 注意
 
 1.该网络训练时会将resnset的第一个卷积层和第一个stage的BasicBlock卷积层freeze,并且训练时resnet中的bn层都设置为eval()模式   
-2. focalloss依赖mmcv的实现，需要安装mmcv-full,另外一些预处理部分也有依赖，这部分容易剔除  
+2. focalloss依赖mmcv的实现（2020-07-23更新，focalloss已经不依赖mmcv)，需要安装mmcv-full,但是另外一些预处理部分也有依赖，不过这部分也容易剔除掉   
 3. 网络的输入要求长和宽都为32的倍数，这和他划分的网格有关，其他尺寸可能会无法计算 
 4. 网络部分整体较为简单，没有奇怪的操作和层，前处理需要短边resize到448（保持比例），normalize，另外一边pad到32的倍数，后处理有一个卷积操作（卷积核心是训练时学习得到，在gpu上运算耗时基本很少），matrix_nms耗时也不多，经过该部分处理后，网络的输出为： 
  
