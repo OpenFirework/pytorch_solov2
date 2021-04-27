@@ -51,7 +51,9 @@ class CocoDataset(Dataset):
                 self.proposal_file = osp.join(self.data_root,
                                               self.proposal_file)
         # load annotations (and proposals)
+
         self.img_infos = self.load_annotations(self.ann_file)
+
         if self.proposal_file is not None:
             self.proposals = self.load_proposals(self.proposal_file)
         else:
@@ -201,8 +203,8 @@ class CocoDataset(Dataset):
         results = dict(img_info=img_info, ann_info=ann_info)
         if self.proposals is not None:
             results['proposals'] = self.proposals[idx]
-        self.pre_pipeline(results)
        
+        self.pre_pipeline(results)
         return self.pipeline(results)
 
     def prepare_test_img(self, idx):

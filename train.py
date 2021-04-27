@@ -56,7 +56,7 @@ def get_warmup_lr(cur_iters, warmup_iters, bash_lr, warmup_ratio, warmup='linear
 def train(epoch_iters = 1, total_epochs = 36):
     #train process pipelines func
     transforms_piplines = build_process_pipeline(cfg.train_pipeline)
-
+    print(transforms_piplines)
     # #build datashet
     casiadata = CocoDataset(ann_file=cfg.dataset.train_info,
                             pipeline = transforms_piplines,
@@ -67,6 +67,7 @@ def train(epoch_iters = 1, total_epochs = 36):
     # #load datashet batchsize = cfg.imgs_per_gpu*cfg.num_gpus
     torchdata_loader = build_dataloader(casiadata, cfg.imgs_per_gpu, cfg.workers_per_gpu, num_gpus=cfg.num_gpus, shuffle=True)
     batchsize = cfg.imgs_per_gpu*cfg.num_gpus
+
     epoch_size = len(casiadata) // batchsize  
     step_index = 0
 
