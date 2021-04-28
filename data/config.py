@@ -219,8 +219,8 @@ solov2_base_config = coco_base_config.copy({
     'dataset': casia_SPT_val,
     'num_classes': len(coco2017_dataset.class_names) + 1,
 
-    'imgs_per_gpu': 4,
-    'workers_per_gpu': 2,
+    'imgs_per_gpu': 2,
+    'workers_per_gpu': 1,
     'num_gpus': 1,
 
     'train_pipeline':  [

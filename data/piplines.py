@@ -7,7 +7,9 @@ from collections.abc import Sequence
 import torch
 from mmcv.parallel import DataContainer as DC
 from .compose import Compose
+import cv2
 
+from .imgutils import rescale_size, imresize, imrescale, imflip, impad, impad_to_multiple
 
 class LoadImageFromFile(object):
 
@@ -21,7 +23,7 @@ class LoadImageFromFile(object):
                                 results['img_info']['filename'])
         else:
             filename = results['img_info']['filename']
-        img = mmcv.imread(filename, self.color_type)
+        img = cv2.imread(filename, cv2.IMREAD_COLOR)
         if self.to_float32:
             img = img.astype(np.float32)
         results['filename'] = filename
@@ -40,12 +42,10 @@ class LoadAnnotations(object):
                  with_bbox=True,
                  with_label=True,
                  with_mask=False,
-                 with_seg=False,
                  poly2mask=True):
         self.with_bbox = with_bbox
         self.with_label = with_label
         self.with_mask = with_mask
-        self.with_seg = with_seg
         self.poly2mask = poly2mask
 
     def _load_bboxes(self, results):
@@ -87,13 +87,6 @@ class LoadAnnotations(object):
         results['mask_fields'].append('gt_masks')
         return results
 
-    def _load_semantic_seg(self, results):
-        results['gt_semantic_seg'] = mmcv.imread(
-            osp.join(results['seg_prefix'], results['ann_info']['seg_map']),
-            flag='unchanged').squeeze()
-        results['seg_fields'].append('gt_semantic_seg')
-        return results
-
     def __call__(self, results):
         if self.with_bbox:
             results = self._load_bboxes(results)
@@ -103,15 +96,11 @@ class LoadAnnotations(object):
             results = self._load_labels(results)
         if self.with_mask:
             results = self._load_masks(results)
-        if self.with_seg:
-            results = self._load_semantic_seg(results)
         return results
 
     def __repr__(self):
         repr_str = self.__class__.__name__
-        repr_str += ('(with_bbox={}, with_label={}, with_mask={},'
-                     ' with_seg={})').format(self.with_bbox, self.with_label,
-                                             self.with_mask, self.with_seg)
+        repr_str += ('(with_bbox={}, with_label={}, with_mask={})').format(self.with_bbox, self.with_label,self.with_mask)
         return repr_str
 
 class Normalize(object):
@@ -142,7 +131,7 @@ class Normalize(object):
                 result dict.
         """
         for key in results.get('img_fields', ['img']):
-            results[key] = mmcv.imnormalize(results[key], self.mean, self.std,
+            results[key] = self.imnormalize(results[key], self.mean, self.std,
                                             self.to_rgb)
         results['img_norm_cfg'] = dict(
             mean=self.mean, std=self.std, to_rgb=self.to_rgb)
@@ -152,6 +141,40 @@ class Normalize(object):
         repr_str = self.__class__.__name__
         repr_str += f'(mean={self.mean}, std={self.std}, to_rgb={self.to_rgb})'
         return repr_str
+
+    def imnormalize(self, img, mean, std, to_rgb=True):
+        """Normalize an image with mean and std.
+        Args:
+            img (ndarray): Image to be normalized.
+            mean (ndarray): The mean to be used for normalize.
+            std (ndarray): The std to be used for normalize.
+            to_rgb (bool): Whether to convert to rgb.
+        Returns:
+            ndarray: The normalized image.
+        """
+        img = img.copy().astype(np.float32)
+        return self.imnormalize_(img, mean, std, to_rgb)
+
+
+    def imnormalize_(self, img, mean, std, to_rgb=True):
+        """Inplace normalize an image with mean and std.
+        Args:
+            img (ndarray): Image to be normalized.
+            mean (ndarray): The mean to be used for normalize.
+            std (ndarray): The std to be used for normalize.
+            to_rgb (bool): Whether to convert to rgb.
+        Returns:
+            ndarray: The normalized image.
+        """
+        # cv2 inplace normalization does not accept uint8
+        assert img.dtype != np.uint8
+        mean = np.float64(mean.reshape(1, -1))
+        stdinv = 1 / np.float64(std.reshape(1, -1))
+        if to_rgb:
+            cv2.cvtColor(img, cv2.COLOR_BGR2RGB, img)  # inplace
+        cv2.subtract(img, mean, img)  # inplace
+        cv2.multiply(img, stdinv, img)  # inplace
+        return img
 
 
 class Resize(object):
@@ -186,12 +209,13 @@ class Resize(object):
                  keep_ratio=True):
         if img_scale is None:
             self.img_scale = None
+            print("img_scale is None")
         else:
             if isinstance(img_scale, list):
                 self.img_scale = img_scale
             else:
                 self.img_scale = [img_scale]
-            assert mmcv.is_list_of(self.img_scale, tuple)
+            assert isinstance(self.img_scale, list)
 
         if ratio_range is not None:
             # mode 1: given a scale and a range of image ratio
@@ -206,14 +230,14 @@ class Resize(object):
 
     @staticmethod
     def random_select(img_scales):
-        assert mmcv.is_list_of(img_scales, tuple)
+        assert isinstance(img_scales, list)
         scale_idx = np.random.randint(len(img_scales))
         img_scale = img_scales[scale_idx]
         return img_scale, scale_idx
 
     @staticmethod
     def random_sample(img_scales):
-        assert mmcv.is_list_of(img_scales, tuple) and len(img_scales) == 2
+        assert isinstance(img_scales, list) and len(img_scales) == 2
         img_scale_long = [max(s) for s in img_scales]
         img_scale_short = [min(s) for s in img_scales]
         long_edge = np.random.randint(
@@ -227,7 +251,7 @@ class Resize(object):
 
     @staticmethod
     def random_sample_ratio(img_scale, ratio_range):
-        assert isinstance(img_scale, tuple) and len(img_scale) == 2
+        assert isinstance(img_scale, list) and len(img_scale) == 2
         min_ratio, max_ratio = ratio_range
         assert min_ratio <= max_ratio
         ratio = np.random.random_sample() * (max_ratio - min_ratio) + min_ratio
@@ -252,10 +276,10 @@ class Resize(object):
 
     def _resize_img(self, results):
         if self.keep_ratio:
-            img, scale_factor = mmcv.imrescale(
+            img, scale_factor = imrescale(
                 results['img'], results['scale'], return_scale=True)
         else:
-            img, w_scale, h_scale = mmcv.imresize(
+            img, w_scale, h_scale = imresize(
                 results['img'], results['scale'], return_scale=True)
             scale_factor = np.array([w_scale, h_scale, w_scale, h_scale],
                                     dtype=np.float32)
@@ -264,6 +288,8 @@ class Resize(object):
         results['pad_shape'] = img.shape  # in case that there is no padding
         results['scale_factor'] = scale_factor
         results['keep_ratio'] = self.keep_ratio
+
+
 
     def _resize_bboxes(self, results):
         img_shape = results['img_shape']
@@ -279,27 +305,17 @@ class Resize(object):
                 continue
             if self.keep_ratio:
                 masks = [
-                    mmcv.imrescale(
+                    imrescale(
                         mask, results['scale_factor'], interpolation='nearest')
                     for mask in results[key]
                 ]
             else:
                 mask_size = (results['img_shape'][1], results['img_shape'][0])
                 masks = [
-                    mmcv.imresize(mask, mask_size, interpolation='nearest')
+                    imresize(mask, mask_size, interpolation='nearest')
                     for mask in results[key]
                 ]
             results[key] = np.stack(masks)
-
-    def _resize_seg(self, results):
-        for key in results.get('seg_fields', []):
-            if self.keep_ratio:
-                gt_seg = mmcv.imrescale(
-                    results[key], results['scale'], interpolation='nearest')
-            else:
-                gt_seg = mmcv.imresize(
-                    results[key], results['scale'], interpolation='nearest')
-            results['gt_semantic_seg'] = gt_seg
 
     def __call__(self, results):
         if 'scale' not in results:
@@ -307,7 +323,7 @@ class Resize(object):
         self._resize_img(results)
         self._resize_bboxes(results)
         self._resize_masks(results)
-        self._resize_seg(results)
+   
         return results
 
     def __repr__(self):
@@ -368,7 +384,7 @@ class RandomFlip(object):
             results['flip_direction'] = self.direction
         if results['flip']:
             # flip image
-            results['img'] = mmcv.imflip(
+            results['img'] = imflip(
                 results['img'], direction=results['flip_direction'])
             # flip bboxes
             for key in results.get('bbox_fields', []):
@@ -378,13 +394,13 @@ class RandomFlip(object):
             # flip masks
             for key in results.get('mask_fields', []):
                 results[key] = np.stack([
-                    mmcv.imflip(mask, direction=results['flip_direction'])
+                    imflip(mask, direction=results['flip_direction'])
                     for mask in results[key]
                 ])
 
             # flip segs
             for key in results.get('seg_fields', []):
-                results[key] = mmcv.imflip(
+                results[key] = imflip(
                     results[key], direction=results['flip_direction'])
         return results
 
@@ -415,9 +431,9 @@ class Pad(object):
 
     def _pad_img(self, results):
         if self.size is not None:
-            padded_img = mmcv.impad(results['img'], shape = self.size)
+            padded_img = impad(results['img'], shape = self.size)
         elif self.size_divisor is not None:
-            padded_img = mmcv.impad_to_multiple(
+            padded_img = impad_to_multiple(
                 results['img'], self.size_divisor, pad_val=self.pad_val)
         results['img'] = padded_img
         results['pad_shape'] = padded_img.shape
@@ -429,7 +445,7 @@ class Pad(object):
         for key in results.get('mask_fields', []):
             
             padded_masks = [
-                mmcv.impad(mask, shape = pad_shape, pad_val=self.pad_val)
+                impad(mask, shape = pad_shape, pad_val=self.pad_val)
                 for mask in results[key]
             ]
             if padded_masks:
@@ -439,7 +455,7 @@ class Pad(object):
 
     def _pad_seg(self, results):
         for key in results.get('seg_fields', []):
-            results[key] = mmcv.impad(results[key], results['pad_shape'][:2])
+            results[key] = impad(results[key], results['pad_shape'][:2])
 
     def __call__(self, results):
         self._pad_img(results)
@@ -469,7 +485,7 @@ def to_tensor(data):
         return data
     elif isinstance(data, np.ndarray):
         return torch.from_numpy(data)
-    elif isinstance(data, Sequence) and not mmcv.is_str(data):
+    elif isinstance(data, Sequence) and not isinstance(data, str):
         return torch.tensor(data)
     elif isinstance(data, int):
         return torch.LongTensor([data])
@@ -572,45 +588,6 @@ class Transpose(object):
         return self.__class__.__name__ + \
             f'(keys={self.keys}, order={self.order})'
 
-
-class ToDataContainer(object):
-    """Convert results to :obj:`mmcv.DataContainer` by given fields.
-
-    Args:
-        fields (Sequence[dict]): Each field is a dict like
-            ``dict(key='xxx', **kwargs)``. The ``key`` in result will
-            be converted to :obj:`mmcv.DataContainer` with ``**kwargs``.
-            Default: ``(dict(key='img', stack=True), dict(key='gt_bboxes'),
-            dict(key='gt_labels'))``.
-    """
-
-    def __init__(self,
-                 fields=(dict(key='img', stack=True), dict(key='gt_bboxes'),
-                         dict(key='gt_labels'))):
-        self.fields = fields
-
-    def __call__(self, results):
-        """Call function to convert data in results to
-        :obj:`mmcv.DataContainer`.
-
-        Args:
-            results (dict): Result dict contains the data to convert.
-
-        Returns:
-            dict: The result dict contains the data converted to
-                :obj:`mmcv.DataContainer`.
-        """
-
-        for field in self.fields:
-            field = field.copy()
-            key = field.pop('key')
-            results[key] = DC(results[key], **field)
-        return results
-
-    def __repr__(self):
-        return self.__class__.__name__ + f'(fields={self.fields})'
-
-
 class DefaultFormatBundle(object):
     """Default formatting bundle.
 
@@ -624,8 +601,6 @@ class DefaultFormatBundle(object):
     - gt_bboxes_ignore: (1)to tensor, (2)to DataContainer
     - gt_labels: (1)to tensor, (2)to DataContainer
     - gt_masks: (1)to tensor, (2)to DataContainer (cpu_only=True)
-    - gt_semantic_seg: (1)unsqueeze dim-0 (2)to tensor,
-                       (3)to DataContainer (stack=True)
     """
 
     def __call__(self, results):
@@ -647,15 +622,15 @@ class DefaultFormatBundle(object):
                 img = np.expand_dims(img, -1)
             img = np.ascontiguousarray(img.transpose(2, 0, 1))
             results['img'] = DC(to_tensor(img), stack=True)
+            #results['img'] = to_tensor(img)
         for key in ['proposals', 'gt_bboxes', 'gt_bboxes_ignore', 'gt_labels']:
             if key not in results:
                 continue
             results[key] = DC(to_tensor(results[key]))
+            #results[key] = to_tensor(results[key])
         if 'gt_masks' in results:
             results['gt_masks'] = DC(results['gt_masks'], cpu_only=True)
-        if 'gt_semantic_seg' in results:
-            results['gt_semantic_seg'] = DC(
-                to_tensor(results['gt_semantic_seg'][None, ...]), stack=True)
+            #results['gt_masks'] = results['gt_masks']
         return results
 
     def _add_default_meta_keys(self, results):
@@ -751,9 +726,10 @@ class Collect(object):
         for key in self.meta_keys:
             img_meta[key] = results[key]
         data['img_metas'] = DC(img_meta, cpu_only=True)
+        
         #data['img_metas'] = img_meta
         for key in self.keys:
-            data[key] = results[key]
+            data[key] = results[key]        
         return data
 
     def __repr__(self):
@@ -767,7 +743,7 @@ class MultiScaleFlipAug(object):
         self.transforms = Compose(transforms)
         self.img_scale = img_scale if isinstance(img_scale,
                                                  list) else [img_scale]
-        assert mmcv.is_list_of(self.img_scale, tuple)
+        assert isinstance(self.img_scale, tuple)
         self.flip = flip
 
     def __call__(self, results):

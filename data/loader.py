@@ -1,6 +1,7 @@
 import platform
 from functools import partial
 from mmcv.parallel import collate
+#from .collate import collate
 from torch.utils.data import DataLoader
 from .group_sampler import GroupSampler
 

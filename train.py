@@ -136,7 +136,7 @@ def train(epoch_iters = 1, total_epochs = 36):
            
 
             for j, data in enumerate(torchdata_loader):
-               
+                
                 if cfg.lr_config['warmup'] is not None and base_nums < cfg.lr_config['warmup_iters']:
                     warm_lr = get_warmup_lr(base_nums, cfg.lr_config['warmup_iters'],
                                             optimizer_config['lr'], cfg.lr_config['warmup_ratio'],
@@ -162,6 +162,7 @@ def train(epoch_iters = 1, total_epochs = 36):
                     label = gradinator(label.cuda())
                     gt_labels.append(label)
                 
+      
                 loss = model.forward(img=imgs,
                         img_meta=img_meta,
                         gt_bboxes=gt_bboxes,
