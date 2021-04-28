@@ -4,7 +4,7 @@
 
 ## 安装
 python 3.6+     
-pip install torch==1.5.1  torchvision==0.6.1  
+pip install torch==1.5.1  torchvision==0.6.1   #更高版本的pytorch经过测试也是OK的
 pip install mmcv     #会执行本地编译cuda代码，可能会花费10分钟左右
 pip install pycocotools      
 pip install numpy   
