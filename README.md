@@ -79,6 +79,84 @@ solov2_base_config = coco_base_config.copy({
     'num_gpus': 1,
 
 ```
+完整的设置项， 在data/config.py中设置
+```python
+# ----------------------- SOLO v2.0 CONFIGS ----------------------- #
+
+solov2_base_config = coco_base_config.copy({
+    'name': 'solov2_base',
+ 
+    'backbone': resnet18_backbone,
+
+    # Dataset stuff
+    'dataset': casia_SPT_val,
+    'num_classes': len(coco2017_dataset.class_names) + 1,
+
+     #batchsize=imgs_per_gpu*workers_per_gpu
+    'imgs_per_gpu': 4,
+    'workers_per_gpu': 2,
+    'num_gpus': 1,
+
+    'train_pipeline':  [
+        dict(type='LoadImageFromFile'),                                #read img process 
+        dict(type='LoadAnnotations', with_bbox=True, with_mask=True),     #load annotations 
+        dict(type='Resize',                                             #多尺度训练，随即从后面的size选择一个尺寸
+            img_scale=[(768, 512), (768, 480), (768, 448),
+                    (768, 416), (768, 384), (768, 352)],
+            multiscale_mode='value',
+            keep_ratio=True),
+        dict(type='RandomFlip', flip_ratio=0.5),                    #随机反转,0.5的概率
+        dict(type='Normalize', mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True),    #normallize                 
+        dict(type='Pad', size_divisor=32),                                #pad另一边的size为32的倍数，solov2对网络输入的尺寸有要求，图像的size需要为32的倍数
+        dict(type='DefaultFormatBundle'),                                #将数据转换为tensor，为后续网络计算
+        dict(type='Collect', keys=['img', 'gt_bboxes', 'gt_labels', 'gt_masks'], meta_keys=('filename', 'ori_shape', 'img_shape', 'pad_shape',
+                            'scale_factor', 'flip', 'img_norm_cfg')),   
+    ],
+
+    'test_cfg': None,
+
+    # learning policy
+    'lr_config': dict(policy='step', warmup='linear', warmup_iters=500, warmup_ratio=0.01, step=[27, 33]),
+    'total_epoch': 36,
+
+    # optimizer
+    'optimizer': dict(type='SGD', lr=0.01, momentum=0.9, weight_decay=0.0001),  
+
+    'optimizer_config': dict(grad_clip=dict(max_norm=35, norm_type=2)),   #梯度平衡策略
+
+    'resume_from': None,    #从保存的权重文件中读取，如果为None则权重自己初始化
+    
+    'epoch_iters_start': 1,    #本次训练的开始迭代起始轮数
+
+    'test_pipeline': [
+        dict(type='LoadImageFromFile'),
+        dict(
+            type='MultiScaleFlipAug',
+            img_scale=(768, 448),
+            flip=False,
+            transforms=[
+                dict(type='Resize', keep_ratio=True),
+                dict(type='RandomFlip'),
+                dict(type='Normalize', mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True),
+                dict(type='Pad', size_divisor=32),
+                dict(type='ImageToTensor', keys=['img']),
+                dict(type='Collect', keys=['img']),
+            ])
+    ],
+
+    'test_cfg': dict(
+                nms_pre=500,
+                score_thr=0.1,
+                mask_thr=0.5,
+                update_thr=0.05,
+                kernel='gaussian',  # gaussian/linear
+                sigma=2.0,
+                max_per_img=30)
+
+})
+```
+
+
 
 - 执行训练
 
