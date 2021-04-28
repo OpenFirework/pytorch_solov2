@@ -2,7 +2,7 @@ import os
 import numpy as np
 from math import sqrt
 import torch
-from .piplines import LoadImageFromFile, LoadAnnotations, Normalize, DefaultFormatBundle, Collect, Resize, Pad, RandomFlip, MultiScaleFlipAug, ImageToTensor
+from .piplines import LoadImageFromFile, LoadAnnotations, Normalize, DefaultFormatBundle, Collect, TestCollect, Resize, Pad, RandomFlip, MultiScaleFlipAug, ImageToTensor
 
 
 process_funcs_dict = {'LoadImageFromFile':  LoadImageFromFile,
@@ -10,6 +10,7 @@ process_funcs_dict = {'LoadImageFromFile':  LoadImageFromFile,
                       'Normalize': Normalize,
                       'DefaultFormatBundle': DefaultFormatBundle,
                       'Collect': Collect,
+                      'TestCollect': TestCollect,
                       'Resize': Resize,
                       'Pad': Pad,
                       'RandomFlip': RandomFlip,

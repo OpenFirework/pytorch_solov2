@@ -7,7 +7,6 @@ from torch.utils.data.dataloader import default_collate
 
 from .data_container import DataContainer
 
-
 def collate(batch, samples_per_gpu=1):
     """Puts each data field into a tensor/DataContainer with outer dimension
     batch size.
@@ -77,6 +76,7 @@ def collate(batch, samples_per_gpu=1):
         transposed = zip(*batch)
         return [collate(samples, samples_per_gpu) for samples in transposed]
     elif isinstance(batch[0], Mapping):
+        transposed = zip(*batch)
         return {
             key: collate([d[key] for d in batch], samples_per_gpu)
             for key in batch[0]

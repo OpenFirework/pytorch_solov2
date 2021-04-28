@@ -1,11 +1,10 @@
 import os.path as osp
 
-import mmcv
 import numpy as np
 import pycocotools.mask as maskUtils
 from collections.abc import Sequence
 import torch
-from mmcv.parallel import DataContainer as DC
+from .data_container import DataContainer as DC
 from .compose import Compose
 import cv2
 
@@ -727,7 +726,30 @@ class Collect(object):
             img_meta[key] = results[key]
         data['img_metas'] = DC(img_meta, cpu_only=True)
         
-        #data['img_metas'] = img_meta
+        for key in self.keys:
+            data[key] = results[key]        
+        return data
+
+    def __repr__(self):
+        return self.__class__.__name__ + \
+            f'(keys={self.keys}, meta_keys={self.meta_keys})'
+
+class TestCollect(object):
+    def __init__(self,
+                 keys,
+                 meta_keys=('filename', 'ori_shape', 'img_shape', 'pad_shape',
+                            'scale_factor', 'flip', 'img_norm_cfg')):
+                            
+        self.keys = keys
+        self.meta_keys = meta_keys
+
+    def __call__(self, results):
+
+        data = {}
+        img_meta = {}
+        for key in self.meta_keys:
+            img_meta[key] = results[key]        
+        data['img_metas'] = img_meta
         for key in self.keys:
             data[key] = results[key]        
         return data
@@ -743,7 +765,7 @@ class MultiScaleFlipAug(object):
         self.transforms = Compose(transforms)
         self.img_scale = img_scale if isinstance(img_scale,
                                                  list) else [img_scale]
-        assert isinstance(self.img_scale, tuple)
+        assert isinstance(self.img_scale, list)
         self.flip = flip
 
     def __call__(self, results):

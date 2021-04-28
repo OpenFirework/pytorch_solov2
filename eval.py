@@ -9,8 +9,6 @@ import torch
 from torch.nn.utils import clip_grad
 import pycocotools.mask as mask_util
 import numpy as np
-import mmcv
-from data.coco_utils import  coco_eval, results2json, results2json_segm
 import cv2 as cv
 from data.compose import Compose
 from glob import glob
@@ -18,6 +16,8 @@ import pycocotools.mask as maskutil
 import json
 import os
 from scipy import ndimage
+from data.imgutils import rescale_size, imresize, imrescale, imflip, impad, impad_to_multiple
+
 
 COCO_LABEL = [1,  2,  3,  4,  5,  6,  7,  8,
                    9, 10, 11, 13, 14, 15, 16, 17,
@@ -163,7 +163,7 @@ def show_result_ins(img,
         mask_density = []
         for idx in range(num_mask):
             cur_mask = seg_label[idx, :, :]
-            cur_mask = mmcv.imresize(cur_mask, (w, h))
+            cur_mask = imresize(cur_mask, (w, h))
             cur_mask = (cur_mask > 0.5).astype(np.int32)
             mask_density.append(cur_mask.sum())
         orders = np.argsort(mask_density)
@@ -180,7 +180,7 @@ def show_result_ins(img,
     for idx in range(num_mask):
         idx = -(idx+1)
         cur_mask = seg_label[idx, :, :]
-        cur_mask = mmcv.imresize(cur_mask, (w, h))
+        cur_mask = imresize(cur_mask, (w, h))
         cur_mask = (cur_mask > 0.5).astype(np.uint8)
         if cur_mask.sum() == 0:
             continue
@@ -195,7 +195,6 @@ def show_result_ins(img,
 
         name_idx = COCO_LABEL_MAP[realclass]
         label_text = COCO_CLASSES[name_idx-1]
-        print(realclass, label_text)
         label_text += '|{:.02f}'.format(cur_score)
         center_y, center_x = ndimage.measurements.center_of_mass(cur_mask)
         vis_pos = (max(int(center_x) - 10, 0), int(center_y))
@@ -212,7 +211,7 @@ def eval(valmodel_weight, data_path, benchmark, test_mode):
                 dict(type='Normalize', mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True),
                 dict(type='Pad', size_divisor=32),
                 dict(type='ImageToTensor', keys=['img']),
-                dict(type='Collect', keys=['img']),
+                dict(type='TestCollect', keys=['img']),
     ]
     transforms_piplines = build_process_pipeline(transforms)
     Multest = process_funcs_dict['MultiScaleFlipAug'](transforms = transforms_piplines, img_scale = (480, 448), flip=False)
@@ -282,7 +281,7 @@ def eval(valmodel_weight, data_path, benchmark, test_mode):
         imgs_nums = len(images)
         results = []
         k = 0
-        save_imgs = False
+        save_imgs = True
         for imgpath in images:
             img_id = img_ids[k]
             data = dict(img=imgpath)
@@ -293,11 +292,12 @@ def eval(valmodel_weight, data_path, benchmark, test_mode):
             img_info = data['img_metas']
             with torch.no_grad():
                 seg_result = model.forward(img=[img], img_meta=[img_info], return_loss=False)
-            out_filepath = "results/" + imgpath
             img_show = show_result_ins(imgpath,seg_result)
 
-            cv.imshow("watch windows",img_show)
-            cv.waitKey(1)
+            #cv.imshow("watch windows",img_show)
+            #cv.waitKey(1)
+            out_filepath = "results/" + os.path.basename(imgpath)
+
             k = k + 1
             if save_imgs:
                 cv.imwrite(out_filepath, img_show)
@@ -311,4 +311,4 @@ def eval(valmodel_weight, data_path, benchmark, test_mode):
             fjson.write(re_js)
             fjson.close()
 
-eval(valmodel_weight='pretrained/solov2_448_r18_epoch_36.pth',data_path="cam0.avi", benchmark=False, test_mode="video")
+eval(valmodel_weight='pretrained/solov2_448_r18_epoch_36.pth',data_path="data/casia-SPT_val/val/JPEGImages", benchmark=False, test_mode="images")
