@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import mmcv
+from data.imgutils import imrescale
+
 from .nninit import xavier_init, kaiming_init, normal_init,bias_init_with_prob
 from .misc import multi_apply, matrix_nms
 from .focal_loss import FocalLoss
@@ -328,7 +329,7 @@ class SOLOv2Head(nn.Module):
                 right = min(right_box, coord_w+1)
 
                 cate_label[top:(down+1), left:(right+1)] = gt_label
-                seg_mask = mmcv.imrescale(seg_mask, scale=1. / output_stride)
+                seg_mask = imrescale(seg_mask, scale=1. / output_stride)
                 seg_mask = torch.Tensor(seg_mask)
                 for i in range(top, down+1):
                     for j in range(left, right+1):
