@@ -165,8 +165,19 @@ python train.py
 ```
 
 ## 评测
-安装好环境后，python eval.py 可以评测coco数据格式的mAP,需要在配置文件中填入标签文件，图片路径等  
-后续加入无标签文件纯图片生成mask和coco格式的json文件的代码   
+安装好环境后
+```Python 
+python eval.py 
+```
+可以评测coco数据格式的mAP,需要在配置文件中填入标签文件，图片路径等  
+后续加入无标签文件纯图片生成mask和coco格式的json文件的代码;
+eval.py 代码内部最后一句：
+```Python 
+eval(valmodel_weight='pretrained/solov2_448_r18_epoch_36.pth',data_path="data/casia-SPT_val/val/JPEGImages", benchmark=False, test_mode="images")
+```
+默认读取基于resnet18训练的网络，权重文件在pretraind文件夹中
+基于resnet34和resnet50的训练完成的权重文件后续会放上链接：
+
 
 
 
