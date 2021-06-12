@@ -1,6 +1,7 @@
 # Pytorch solov2 工程
 
-
+本份代码从solov2的官方作者的原版代码中抽出来一部分，便于理解；  
+目前只支持resnet18、resnet34两种backbone的训练和测试.   
 
 ## 安装
 python 3.6+     
