@@ -208,7 +208,6 @@ class Resize(object):
                  keep_ratio=True):
         if img_scale is None:
             self.img_scale = None
-            print("img_scale is None")
         else:
             if isinstance(img_scale, list):
                 self.img_scale = img_scale
