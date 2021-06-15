@@ -1,3 +1,5 @@
+English | [简体中文](README_ch.md)
+
 # Pytorch solov2 project
 This code is a partial code extracted from the original code of the official author of SOLOV2 (the part of the lightweight implementation of SOLOV2_LIGHT), which does not rely on MMDetetion and MMCV. It is still relatively simple and has a lot of shortcomings to be improved. 
 
