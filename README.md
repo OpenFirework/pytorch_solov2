@@ -1,7 +1,7 @@
 # Pytorch solov2 工程
 
-本份代码从solov2的官方作者的原版代码中抽出来一的部分代码(Solov2_Light 轻量级网络的部分)，不依赖mmdetetion和mmcv，目前做的还比较简陋，有很多不足需要改进。  
-官方代码： https://github.com/WXinlong/SOLO
+本份代码从solov2的官方作者的原版代码中抽出来一的部分代码(Solov2_Light 轻量级实现的部分)，不依赖mmdetetion和mmcv，目前做的还比较简陋，有很多不足需要改进。  
+官方代码： https://github.com/WXinlong/SOLO       
 论文： https://arxiv.org/abs/2003.10152 
 
 ## 不足
