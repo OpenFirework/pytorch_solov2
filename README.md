@@ -7,9 +7,9 @@ official code： https://github.com/WXinlong/SOLO
 paper： https://arxiv.org/abs/2003.10152 
 
 ## shortages
-1、Only supports Resnet18, Resnet34 backbone to train.
-2、Multi GPU parallel training is not supported.
-3、Incomplete configuration items for training and testing. 
+1、Only supports Resnet18, Resnet34 backbone to train.   
+2、Multi GPU parallel training is not supported.   
+3、Incomplete configuration items for training and testing.     
 
 ## Install
 python 3.6+     
