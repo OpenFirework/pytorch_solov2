@@ -202,7 +202,7 @@ resnet34:  ./pretrained/resnet18_nofc.pth
 **solov2 light weight trained on coco2017**  
 ```shell
 SOLOv2_Light_448_R18_36: ./pretrained/solov2_448_r18_epoch_36.pth 
-SOLOv2_Light_448_R18_34: later
+SOLOv2_Light_448_R34_36: later
 ```
 
 
