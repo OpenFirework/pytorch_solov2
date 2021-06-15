@@ -2,6 +2,7 @@
 
 本份代码从solov2的官方作者的原版代码中抽出来一的部分代码(Solov2_Light 轻量级网络的部分)，不依赖mmdetetion和mmcv，目前做的还比较简陋，有很多不足需要改进。  
 官方代码： https://github.com/WXinlong/SOLO
+论文： https://arxiv.org/abs/2003.10152 
 
 ## 不足
 1、只支持resnet18、resnet34两种backbone的训练和测试.   
@@ -173,16 +174,21 @@ python train.py
 ```
 
 ## 评测
-安
+根据数据集修改eval.py代码最后一句
 ```Python 
-python eval.py 
+# valmodel_weight     model weight
+# data_path           images path
+# benchmark         whether write result json to file 
+# test_mode 
+# save_imgs         whether save result image to results path
+eval(valmodel_weight='pretrained/solov2_448_r18_epoch_36.pth',data_path="data/casia-SPT_val/val/JPEGImages", benchmark=False, test_mode="images", save_imgs=False)
+#eval(valmodel_weight='pretrained/solov2_448_r18_epoch_36.pth',data_path="cam0.avi", benchmark=False, test_mode="video")
 ```
-可以评测coco数据格式的mAP,需要在配置文件中填入标签文件，图片路径等  
-后续加入无标签文件纯图片生成mask和coco格式的json文件的代码;
-eval.py 代码内部最后一句：
-```Python 
-eval(valmodel_weight='pretrained/solov2_448_r18_epoch_36.pth',data_path="data/casia-SPT_val/val/JPEGImages", benchmark=False, test_mode="images")
+运行评测
+```Python
+python eval.py
 ```
+
 
 ## 权重文件
 
@@ -194,9 +200,6 @@ resnet34:  ./pretrained/resnet18_nofc.pth
 ``` 
 
 **solov2 light weight trained on coco2017**  
-```shell
-resnet18: ./pretrained/resnet18_nofc.pth
-resnet34:  ./pretrained/resnet18_nofc.pth
 ```shell
 SOLOv2_Light_448_R18_36: ./pretrained/solov2_448_r18_epoch_36.pth 
 SOLOv2_Light_448_R18_34: later
