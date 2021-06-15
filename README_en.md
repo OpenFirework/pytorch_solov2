@@ -215,7 +215,7 @@ SOLOv2_Light_448_R18_34: later
 ## Other 
 
 1.该网络训练时会将resnset的第一个卷积层和第一个stage的BasicBlock卷积层freeze,并且训练时resnet中的bn层都设置为eval()模式   
-2. The inputs of solov2 require multiples of 32 in both length and width, depending on the grid he is drawing, and other dimensions may be impossible to calculate. 
+2. The inputs of solov2 require multiples of 32 in both length and width, depending on the grid he is drawing, and other dimensions may be impossible to calculate.      
 3. Solov2 is relatively simple on the whole, with no strange operations or layers. There is a convolution operation in post-processing (the convolution core is learned during training, and it takes little time to compute on GPU). Matrix_NMS also takes little time. After this part of processing, the output of the network is:
  ```
 mask [nums, height, weight]    #masks's number， 
