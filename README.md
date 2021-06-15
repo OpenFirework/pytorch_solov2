@@ -200,7 +200,7 @@ python eval.py
 
 ## weight files
 
-**backbone pretrained weights**
+**backbone pretrained weights**      
 from torchvision, prtrained weight in imagenet  
 ```shell
 resnet18: ./pretrained/resnet18_nofc.pth
