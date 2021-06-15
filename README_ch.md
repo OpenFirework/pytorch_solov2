@@ -202,7 +202,11 @@ resnet34:  ./pretrained/resnet18_nofc.pth
 **solov2 light weight trained on coco2017**  
 ```shell
 SOLOv2_Light_448_R18_36: ./pretrained/solov2_448_r18_epoch_36.pth 
-SOLOv2_Light_448_R34_36: later
+SOLOv2_Light_448_R34_36:  https://drive.google.com/file/d/1F3VRX1nZPnjKrzAC7Z4EmAlwmG-GWF8u/view?usp=sharing
+or
+链接：https://pan.baidu.com/s/1MCVkAeKwTua-m9g1NLyRpw 
+提取码：ljkk 
+复制这段内容后打开百度网盘手机App，操作更方便哦
 ```
 
 
