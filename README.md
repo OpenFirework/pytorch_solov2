@@ -51,6 +51,12 @@ python train.py
 ```
 ### config.py 
 - **if use COCO dataset**    
+```
+coco2017/
+├── annotations
+├── train2017
+└── val2017
+```
 in 'data' path run command:
 ```
 ln -s /path/coco2017 coco    
