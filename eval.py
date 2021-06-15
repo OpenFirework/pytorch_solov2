@@ -204,7 +204,7 @@ def show_result_ins(img,
     return img_show
 
 
-def eval(valmodel_weight, data_path, benchmark, test_mode):
+def eval(valmodel_weight, data_path, benchmark, test_mode, save_imgs=False):
     
     test_pipeline = []
     transforms=[ dict(type='Resize', keep_ratio=True),
@@ -281,7 +281,6 @@ def eval(valmodel_weight, data_path, benchmark, test_mode):
         imgs_nums = len(images)
         results = []
         k = 0
-        save_imgs = True
         for imgpath in images:
             img_id = img_ids[k]
             data = dict(img=imgpath)
@@ -311,4 +310,5 @@ def eval(valmodel_weight, data_path, benchmark, test_mode):
             fjson.write(re_js)
             fjson.close()
 
-eval(valmodel_weight='pretrained/solov2_448_r18_epoch_36.pth',data_path="data/casia-SPT_val/val/JPEGImages", benchmark=False, test_mode="images")
+eval(valmodel_weight='pretrained/solov2_448_r18_epoch_36.pth',data_path="data/casia-SPT_val/val/JPEGImages", benchmark=False, test_mode="images", save_imgs=False)
+#eval(valmodel_weight='pretrained/solov2_448_r18_epoch_36.pth',data_path="cam0.avi", benchmark=False, test_mode="video")
