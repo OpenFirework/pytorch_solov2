@@ -202,7 +202,7 @@ class SOLOV2(nn.Module):
         torch.save(self.state_dict(), path)
 
     def load_weights(self, path):
-        state_dict = torch.load(path)
+        state_dict = torch.load(path, weights_only=True)
         self.load_state_dict(state_dict)
  
     def extract_feat(self, img):
